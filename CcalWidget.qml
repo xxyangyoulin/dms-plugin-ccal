@@ -21,6 +21,10 @@ PluginComponent {
     property string formattedDate: ""
 
     function updateFormattedDate() {
+        if (!ChineseCalendarService.ccalAvailable) {
+            formattedDate = "未安装 ccal"
+            return
+        }
         const format = SettingsData.getPluginSettingsForPlugin(pluginId).dateFormat ?? "ddd MM月dd日 LL"
         formattedDate = ChineseCalendarService.formatDate(format) || ""
     }
@@ -32,6 +36,9 @@ PluginComponent {
             updateFormattedDate()
         }
         function onCurrentLunarDayChanged() {
+            updateFormattedDate()
+        }
+        function onCcalCheckCompleted() {
             updateFormattedDate()
         }
     }
@@ -96,6 +103,7 @@ PluginComponent {
             readonly property bool ccalChecking: ChineseCalendarService.ccalChecking
 
             function changeMonth(delta) {
+                if (!ccalAvailable) return
                 const newDate = new Date(displayDate)
                 newDate.setMonth(newDate.getMonth() + delta)
                 displayDate = newDate
@@ -111,6 +119,7 @@ PluginComponent {
             }
 
             function goToToday() {
+                if (!ccalAvailable) return
                 const today = new Date()
                 displayDate = today
                 selectedDate = today
@@ -195,11 +204,15 @@ PluginComponent {
                             width: 120
                             height: 40
                             radius: Theme.cornerRadius
-                            color: refreshArea.containsMouse ? Theme.withAlpha(Theme.primary, 0.15) : Theme.withAlpha(Theme.primary, 0.08)
+                            color: !ccalChecking && refreshArea.containsMouse ? Theme.withAlpha(Theme.primary, 0.15) : Theme.withAlpha(Theme.primary, 0.08)
+                            opacity: ccalChecking ? 0.7 : 1.0
                             anchors.centerIn: parent
 
                             Behavior on color {
                                 ColorAnimation { duration: 150 }
+                            }
+                            Behavior on opacity {
+                                NumberAnimation { duration: 150 }
                             }
 
                             Row {
@@ -207,10 +220,10 @@ PluginComponent {
                                 spacing: Theme.spacingS
 
                                 DankIcon {
-                                    name: ccalChecking ? "refresh" : "refresh"
+                                    name: "refresh"
                                     size: 18
                                     color: Theme.primary
-                                    // Add spinning animation when checking
+                                    // Spinning animation when checking
                                     RotationAnimation on rotation {
                                         running: ccalChecking
                                         from: 0
@@ -232,10 +245,12 @@ PluginComponent {
                             MouseArea {
                                 id: refreshArea
                                 anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
+                                hoverEnabled: !ccalChecking
+                                cursorShape: ccalChecking ? Qt.ArrowCursor : Qt.PointingHandCursor
                                 onClicked: {
-                                    ChineseCalendarService.recheckCcalAvailability()
+                                    if (!ccalChecking) {
+                                        ChineseCalendarService.recheckCcalAvailability()
+                                    }
                                 }
                             }
                         }
