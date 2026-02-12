@@ -1,54 +1,28 @@
-# Chinese Calendar Widget for DankMaterialShell
+# Chinese Calendar for [DankMaterialShell](https://github.com/DankMaterialShell/DankMaterialShell)
 
-DankMaterialShell status bar widget for Chinese lunar calendar. Display current lunar date in the status bar and click to reveal a full lunar calendar popup.
+![Screenshot](assets/screenshot.png)
+
+Display Chinese lunar calendar (农历) with holiday information directly in your status bar.
 
 ## Features
 
-- **Status Bar Display**: Shows current lunar date (e.g., 十四、十五)
-- **Popup Calendar**: Click the status bar icon to reveal the full lunar calendar
-- **Date Grid**: Each date cell shows the corresponding lunar date below it
-- **Month Navigation**: Browse through different months
-- **Language Toggle**: Support for Simplified and Traditional Chinese
-- **Customizable Options**: Configure icon, date format, and more
-
-## Status Bar Display
-
-Default format: `📅 2/11 十四`
-
-## Popup Calendar
-
-```
-┌─────────────────────────────┐
-│        农历日历              │
-├─────────────────────────────┤
-│  <    February 2026    >    │
-│  Su Mo Tu We Th Fr Sa       │
-│  ───────────────────────    │
-│  1   2   3   4   5   6   7  │
-│ 十四 十五 十六 ...           │
-│  8   9  10  11  12  13  14  │
-│ 廿一 廿二 廿三 ...           │
-│  ...                        │
-├─────────────────────────────┤
-│   Year BingWu, Month 1D     │
-│   今天是农历 十四            │
-└─────────────────────────────┘
-```
+- **Status Bar Widget**: Customizable display of Gregorian and Lunar dates.
+- **Full Lunar Calendar**: Popup view showing lunar dates, solar terms (节气), and festivals.
+- **Holiday Integration**: Real-time indication of holidays and make-up workdays (调休) sourced from `holiday-cn`.
+- **Smart Navigation**: Scroll to change months, click to jump to specific dates, and quick return to "Today".
+- **Detailed Info**: View detailed information for any selected date, including days until the next holiday.
 
 ## Requirements
 
-- **System Package**: `ccal` command is required for lunar calendar data
-- **System Package**: `curl` command is required for fetching holiday information
+- **System Package**: `ccal` is required for generating lunar calendar data.
+- **System Package**: `curl` is required for fetching holiday definitions.
+- Network connection for holiday data updates.
 
 ## Configuration
 
-1. Go to Plugin Settings
-2. Customize display options:
-   - Show/Hide icon
-   - Show/Hide Gregorian date
-   - Show/Hide lunar date
-   - Date format (M/D, M月D日, MM/DD)
-   - Character type (Simplified/Traditional)
+1. Go to Plugin Settings.
+2. Customize the **Date Format** string (e.g., `ddd MM月dd日 LL`).
+   - Supported tokens: `LL` (Lunar Date), `yyyy` (Year), `MM` (Month), etc.
 
 ## Install ccal
 
@@ -57,18 +31,20 @@ Default format: `📅 2/11 十四`
 yay -S ccal
 ```
 
-### Debian / Ubuntu
-```bash
-sudo apt install ccal
-```
-
-### Fedora
-```bash
-sudo dnf install ccal
-```
-
 ## Permissions
 
 - `settings_read` / `settings_write`
-- `process` - For executing ccal command
-- `network` - For fetching holiday data
+- `process`
+- `network`
+
+## Credits
+
+This project is based on and powered by:
+
+- **[ccal](http://ccal.chinesebay.com/ccal/ccal.htm)**: Provides the core lunar calendar calculation engine.
+- **[hodiday](https://github.com/tomandjerry136/hodiday)**: Provides the holiday arrangement data source.
+
+## Feedback & Contributions
+
+Suggestions for improvements and feature requests are always welcome.
+If you have ideas, encounter issues, or want to see new features, feel free to open an issue or submit a pull request.
