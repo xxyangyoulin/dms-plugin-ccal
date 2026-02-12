@@ -12,6 +12,11 @@ Singleton {
     readonly property string pluginId: "chineseCalendar"
     readonly property string ccalPath: "ccal"
 
+    // Ccal availability status
+    property bool ccalAvailable: false
+    property bool ccalChecking: false
+    signal ccalCheckCompleted
+
     // Lunar data cache
     property var lunarDataCache: ({})
     property string currentLunarDay: ""
@@ -38,19 +43,43 @@ Singleton {
     // Update dates every minute
     Timer {
         interval: 60000
-        running: true
+        running: ccalAvailable
         repeat: true
         triggeredOnStart: true
         onTriggered: {
             // console.info("[ChineseCalendarService] Timer triggered, loading current month data...")
-            loadCurrentMonthData()
-            loadHolidayData()
+            if (ccalAvailable) {
+                loadCurrentMonthData()
+                loadHolidayData()
+            }
         }
     }
 
-    // Initialize: load cached holiday data
+    // Initialize: check ccal availability and load cached holiday data
     Component.onCompleted: {
+        checkCcalAvailability()
         loadCachedHolidayData()
+    }
+
+    // Check if ccal command is available
+    function checkCcalAvailability() {
+        ccalChecking = true
+        Proc.runCommand("ccal-check", ["which", ccalPath], (stdout, exitCode) => {
+            ccalAvailable = (exitCode === 0)
+            ccalChecking = false
+            ccalCheckCompleted()
+            if (!ccalAvailable) {
+                console.info("[ChineseCalendarService] ccal not found, plugin will show installation prompt")
+            } else {
+                console.info("[ChineseCalendarService] ccal found, loading data")
+                loadCurrentMonthData()
+            }
+        }, 50)
+    }
+
+    // Recheck ccal availability (for refresh button)
+    function recheckCcalAvailability() {
+        checkCcalAvailability()
     }
 
     // Format gregorian date according to settings
@@ -228,6 +257,8 @@ Singleton {
     }
 
     function loadMonthData(year, month) {
+        if (!ccalAvailable) return
+
         const monthKey = year + "-" + (month + 1).toString().padStart(2, "0")
         const args = ["-x", "-g", "-u", (month + 1).toString(), year.toString()]
 

@@ -49,8 +49,8 @@ PluginComponent {
     }
 
     Component.onCompleted: {
-        // Immediately load lunar data if empty
-        if (!ChineseCalendarService.currentLunarDay) {
+        // Immediately load lunar data if ccal is available and data is empty
+        if (ChineseCalendarService.ccalAvailable && !ChineseCalendarService.currentLunarDay) {
             ChineseCalendarService.loadCurrentMonthData()
         }
         // Initial update of formatted date
@@ -91,6 +91,10 @@ PluginComponent {
             property date selectedDate: new Date()
             property bool isShowingToday: true
 
+            // Ccal availability status from service
+            readonly property bool ccalAvailable: ChineseCalendarService.ccalAvailable
+            readonly property bool ccalChecking: ChineseCalendarService.ccalChecking
+
             function changeMonth(delta) {
                 const newDate = new Date(displayDate)
                 newDate.setMonth(newDate.getMonth() + delta)
@@ -127,20 +131,121 @@ PluginComponent {
 
             onDisplayDateChanged: {
                 currentMonthKey = ""
-                ChineseCalendarService.loadMonthData(displayDate.getFullYear(), displayDate.getMonth())
-                ChineseCalendarService.loadHolidayDataForYear(displayDate.getFullYear())
+                if (ccalAvailable) {
+                    ChineseCalendarService.loadMonthData(displayDate.getFullYear(), displayDate.getMonth())
+                    ChineseCalendarService.loadHolidayDataForYear(displayDate.getFullYear())
+                }
                 Qt.callLater(() => {
                     currentMonthKey = Qt.formatDate(displayDate, "yyyy-MM")
                 })
                 updateShowingToday()
             }
 
+            // Main content area - shows either error message or calendar
             Item {
                 width: parent.width
-                height: contentColumn.height
+                height: ccalAvailable ? contentColumn.height : errorColumn.height
 
+                // Error message when ccal is not installed
+                Column {
+                    id: errorColumn
+                    visible: !ccalAvailable
+                    width: parent.width
+                    spacing: Theme.spacingL
+
+                    // Warning icon
+                    Item {
+                        width: parent.width
+                        height: 80
+
+                        DankIcon {
+                            anchors.centerIn: parent
+                            name: "warning"
+                            size: 48
+                            color: Theme.warning
+                        }
+                    }
+
+                    // Error message
+                    StyledText {
+                        width: parent.width
+                        text: "未安装 ccal"
+                        font.pixelSize: Theme.fontSizeMedium
+                        color: Theme.surfaceText
+                        font.weight: Font.Medium
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+
+                    // Description
+                    StyledText {
+                        width: parent.width - Theme.spacingL * 2
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: "农历日历功能需要安装 ccal 工具"
+                        font.pixelSize: Theme.fontSizeSmall
+                        color: Theme.withAlpha(Theme.surfaceText, 0.7)
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+
+                    // Refresh button
+                    Item {
+                        width: parent.width
+                        height: 48
+
+                        Rectangle {
+                            width: 120
+                            height: 40
+                            radius: Theme.cornerRadius
+                            color: refreshArea.containsMouse ? Theme.withAlpha(Theme.primary, 0.15) : Theme.withAlpha(Theme.primary, 0.08)
+                            anchors.centerIn: parent
+
+                            Behavior on color {
+                                ColorAnimation { duration: 150 }
+                            }
+
+                            Row {
+                                anchors.centerIn: parent
+                                spacing: Theme.spacingS
+
+                                DankIcon {
+                                    name: ccalChecking ? "refresh" : "refresh"
+                                    size: 18
+                                    color: Theme.primary
+                                    // Add spinning animation when checking
+                                    RotationAnimation on rotation {
+                                        running: ccalChecking
+                                        from: 0
+                                        to: 360
+                                        loops: Animation.Infinite
+                                        duration: 1000
+                                    }
+                                }
+
+                                StyledText {
+                                    text: ccalChecking ? "检查中..." : "刷新"
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Theme.primary
+                                    font.weight: Font.Medium
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+                            }
+
+                            MouseArea {
+                                id: refreshArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    ChineseCalendarService.recheckCcalAvailability()
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Normal calendar content (shown when ccal is available)
                 Column {
                     id: contentColumn
+                    visible: ccalAvailable
                     width: parent.width
 
                     // Month navigation
@@ -450,7 +555,7 @@ PluginComponent {
                     height: 48
                     radius: width / 2
                     color: Theme.primary
-                    visible: !popoutRoot.isShowingToday
+                    visible: ccalAvailable && !popoutRoot.isShowingToday
 
                     anchors {
                         right: parent.right
@@ -491,7 +596,9 @@ PluginComponent {
 
             Component.onCompleted: {
                 currentMonthKey = ""
-                ChineseCalendarService.loadMonthData(popoutRoot.displayDate.getFullYear(), popoutRoot.displayDate.getMonth())
+                if (ccalAvailable) {
+                    ChineseCalendarService.loadMonthData(popoutRoot.displayDate.getFullYear(), popoutRoot.displayDate.getMonth())
+                }
                 Qt.callLater(() => {
                     currentMonthKey = Qt.formatDate(popoutRoot.displayDate, "yyyy-MM")
                 })
