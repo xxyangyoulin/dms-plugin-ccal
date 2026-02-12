@@ -82,22 +82,6 @@ Singleton {
         checkCcalAvailability()
     }
 
-    // Format gregorian date according to settings
-    function formatGregorianDate() {
-        const today = new Date()
-        const day = today.getDate()
-        const month = today.getMonth() + 1
-        const year = today.getFullYear()
-
-        return dateFormat
-            .replace("YYYY", year.toString())
-            .replace("YY", (year % 100).toString().padStart(2, "0"))
-            .replace("MM", month.toString().padStart(2, "0"))
-            .replace("M", month.toString())
-            .replace("DD", day.toString().padStart(2, "0"))
-            .replace("D", day.toString())
-    }
-
     // Load holiday data for current year with caching
     function loadHolidayData() {
         const today = new Date()
@@ -421,26 +405,37 @@ Singleton {
 
         const lunarMonthInfo = currentLunarInfo || lunarMonthName
 
+        // Use placeholders to prevent replaced values from being matched by later patterns
+        const replacements = []
+        function ph(value) {
+            const idx = replacements.length
+            replacements.push(value)
+            return "\x00" + idx + "\x00"
+        }
+
         let result = formatStr
 
         // Replace lunar format first (longer patterns first)
-        result = result.replace(/LLLL/g, lunarMonthInfo + lunarDay)
-        result = result.replace(/LLL/g, lunarMonthOnly + lunarDay)
-        result = result.replace(/LL/g, lunarDay)
-        result = result.replace(/LA/g, zodiac)
-        result = result.replace(/LY/g, lunarYear)
+        result = result.replace(/LLLL/g, ph(lunarMonthInfo + lunarDay))
+        result = result.replace(/LLL/g, ph(lunarMonthOnly + lunarDay))
+        result = result.replace(/LL/g, ph(lunarDay))
+        result = result.replace(/LA/g, ph(zodiac))
+        result = result.replace(/LY/g, ph(lunarYear))
 
         // Replace gregorian formats (longer patterns first)
-        result = result.replace(/dddd/g, "星期" + weekDays[weekDay])
-        result = result.replace(/ddd/g, weekDays[weekDay])
-        result = result.replace(/MMMM/g, monthFullNames[month - 1])
-        result = result.replace(/MMM/g, monthNames[month - 1])
-        result = result.replace(/yyyy/g, year.toString())
-        result = result.replace(/yy/g, yearShort.toString().padStart(2, "0"))
-        result = result.replace(/MM/g, month.toString().padStart(2, "0"))
-        result = result.replace(/M/g, month.toString())
-        result = result.replace(/dd/g, day.toString().padStart(2, "0"))
-        result = result.replace(/d/g, day.toString())
+        result = result.replace(/dddd/g, ph("星期" + weekDays[weekDay]))
+        result = result.replace(/ddd/g, ph(weekDays[weekDay]))
+        result = result.replace(/MMMM/g, ph(monthFullNames[month - 1]))
+        result = result.replace(/MMM/g, ph(monthNames[month - 1]))
+        result = result.replace(/yyyy/g, ph(year.toString()))
+        result = result.replace(/yy/g, ph(yearShort.toString().padStart(2, "0")))
+        result = result.replace(/MM/g, ph(month.toString().padStart(2, "0")))
+        result = result.replace(/M/g, ph(month.toString()))
+        result = result.replace(/dd/g, ph(day.toString().padStart(2, "0")))
+        result = result.replace(/d/g, ph(day.toString()))
+
+        // Replace all placeholders with actual values
+        result = result.replace(/\x00(\d+)\x00/g, (_, idx) => replacements[parseInt(idx)])
 
         return result
     }

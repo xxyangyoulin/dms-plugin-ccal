@@ -101,16 +101,13 @@ PluginComponent {
             // Ccal availability status from service
             readonly property bool ccalAvailable: ChineseCalendarService.ccalAvailable
             readonly property bool ccalChecking: ChineseCalendarService.ccalChecking
+            readonly property color workdayColor: "#43a047"
 
             function changeMonth(delta) {
                 if (!ccalAvailable) return
                 const newDate = new Date(displayDate)
                 newDate.setMonth(newDate.getMonth() + delta)
                 displayDate = newDate
-                currentMonthKey = Qt.formatDate(newDate, "yyyy-MM")
-                ChineseCalendarService.loadMonthData(newDate.getFullYear(), newDate.getMonth())
-                ChineseCalendarService.loadHolidayDataForYear(newDate.getFullYear())
-                updateShowingToday()
             }
 
             function selectDate(date) {
@@ -123,9 +120,6 @@ PluginComponent {
                 const today = new Date()
                 displayDate = today
                 selectedDate = today
-                currentMonthKey = Qt.formatDate(today, "yyyy-MM")
-                ChineseCalendarService.loadMonthData(today.getFullYear(), today.getMonth())
-                ChineseCalendarService.loadHolidayDataForYear(today.getFullYear())
                 updateShowingToday()
             }
 
@@ -370,6 +364,7 @@ PluginComponent {
                         property date displayDate: popoutRoot.displayDate
                         property string displayMonthKey: popoutRoot.currentMonthKey ?? ""
                         property int cacheVersion: ChineseCalendarService.dataVersion
+                        readonly property string todayDateString: new Date().toDateString()
                         readonly property date firstDay: {
                             if (!displayDate) return new Date()
                             const firstOfMonth = new Date(displayDate.getFullYear(), displayDate.getMonth(), 1)
@@ -392,19 +387,19 @@ PluginComponent {
                                     return date
                                 }
                                 readonly property bool isCurrentMonth: dayDate.getMonth() === calendarGrid.displayDate.getMonth()
-                                readonly property bool isToday: dayDate.toDateString() === new Date().toDateString()
+                                readonly property bool isToday: dayDate.toDateString() === calendarGrid.todayDateString
                                 readonly property bool isSelected: dayDate.toDateString() === popoutRoot.selectedDate.toDateString()
                                 readonly property string dateStr: Qt.formatDate(dayDate, "yyyy-MM-dd")
                                 readonly property var holidayInfo: ChineseCalendarService.getHolidayInfo(dateStr)
                                 readonly property bool isHoliday: holidayInfo?.isHoliday || false
                                 readonly property bool isWorkday: holidayInfo?.isWorkday || false
+                                readonly property string lunarDayText: ChineseCalendarService.getLunarDayForDate(dayDate.getDate(), dayDate.getMonth(), dayDate.getFullYear(), calendarGrid.cacheVersion)
                                 readonly property string displayText: {
-                                    const dateStr = Qt.formatDate(dayDate, "yyyy-MM-dd")
                                     const holidayName = ChineseCalendarService.getHolidayName(dateStr)
                                     if (holidayName) return holidayName
-                                    return ChineseCalendarService.getLunarDayForDate(dayDate.getDate(), dayDate.getMonth(), dayDate.getFullYear(), calendarGrid.cacheVersion)
+                                    return lunarDayText
                                 }
-                                readonly property bool hasHoliday: displayText !== ChineseCalendarService.getLunarDayForDate(dayDate.getDate(), dayDate.getMonth(), dayDate.getFullYear(), calendarGrid.cacheVersion)
+                                readonly property bool hasHoliday: displayText !== lunarDayText
 
                                 width: parent.width / 7
                                 height: parent.height / 6
@@ -420,7 +415,7 @@ PluginComponent {
                                         } else if (isHoliday) {
                                             return Theme.withAlpha(Theme.error, 0.15)
                                         } else if (isWorkday) {
-                                            return Theme.withAlpha("#43a047", 0.12)
+                                            return Theme.withAlpha(popoutRoot.workdayColor, 0.12)
                                         } else if (dayMouseArea.containsMouse) {
                                             return Theme.withAlpha(Theme.primary, 0.06)
                                         } else {
@@ -446,11 +441,11 @@ PluginComponent {
                                         StyledText {
                                             anchors.horizontalCenter: parent.horizontalCenter
                                             text: {
-                                                if (displayText === "国庆节、中秋节") return "国庆+中秋"
-                                                if (displayText === "春节、清明节") return "春节+清明"
-                                                if (displayText === "清明节、劳动节") return "清明+劳动"
                                                 if (displayText.includes("、")) {
-                                                    return displayText.split("、")[0]
+                                                    const parts = displayText.split("、")
+                                                    const shortened = parts.map(p => p.endsWith("节") && p.length > 2 ? p.slice(0, -1) : p)
+                                                    const joined = shortened.join("+")
+                                                    return joined.length > 5 ? shortened[0] : joined
                                                 }
                                                 return displayText
                                             }
@@ -458,7 +453,7 @@ PluginComponent {
                                             color: {
                                                 if (hasHoliday) {
                                                     if (isHoliday) return Theme.error
-                                                    if (isWorkday) return "#43a047"
+                                                    if (isWorkday) return popoutRoot.workdayColor
                                                 }
                                                 return Theme.withAlpha(Theme.primary, isCurrentMonth ? 0.8 : 0.5)
                                             }
@@ -554,7 +549,7 @@ PluginComponent {
                                     const dateStr = Qt.formatDate(date, "yyyy-MM-dd")
                                     const holidayInfo = ChineseCalendarService.getHolidayInfo(dateStr)
                                     if (holidayInfo?.isHoliday) return Theme.error
-                                    if (holidayInfo?.isWorkday) return "#43a047"
+                                    if (holidayInfo?.isWorkday) return popoutRoot.workdayColor
                                     return Theme.withAlpha(Theme.surfaceText, 0.9)
                                 }
                                 anchors.horizontalCenter: parent.horizontalCenter
@@ -610,13 +605,10 @@ PluginComponent {
             }
 
             Component.onCompleted: {
-                currentMonthKey = ""
                 if (ccalAvailable) {
-                    ChineseCalendarService.loadMonthData(popoutRoot.displayDate.getFullYear(), popoutRoot.displayDate.getMonth())
+                    ChineseCalendarService.loadMonthData(displayDate.getFullYear(), displayDate.getMonth())
+                    ChineseCalendarService.loadHolidayDataForYear(displayDate.getFullYear())
                 }
-                Qt.callLater(() => {
-                    currentMonthKey = Qt.formatDate(popoutRoot.displayDate, "yyyy-MM")
-                })
                 updateShowingToday()
             }
         }
