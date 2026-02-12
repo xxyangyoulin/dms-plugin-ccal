@@ -98,10 +98,31 @@ PluginComponent {
             property date selectedDate: new Date()
             property bool isShowingToday: true
 
+            // F4: Month selector state
+            property bool showingMonthSelector: false
+            property int selectorYear: displayDate.getFullYear()
+
             // Ccal availability status from service
             readonly property bool ccalAvailable: ChineseCalendarService.ccalAvailable
             readonly property bool ccalChecking: ChineseCalendarService.ccalChecking
             readonly property color workdayColor: "#43a047"
+
+            // F1: Weekend color and helper
+            readonly property color weekendColor: Theme.error
+            function isWeekendColumn(columnIndex) {
+                const loc = Qt.locale()
+                const qtFirst = loc.firstDayOfWeek
+                const qtDay = ((qtFirst - 1 + columnIndex) % 7) + 1
+                return qtDay === 6 || qtDay === 7 // Saturday or Sunday
+            }
+
+            // F7: Wheel cooldown
+            property bool wheelCooldown: false
+            Timer {
+                id: wheelCooldownTimer
+                interval: 300
+                onTriggered: popoutRoot.wheelCooldown = false
+            }
 
             function changeMonth(delta) {
                 if (!ccalAvailable) return
@@ -117,6 +138,7 @@ PluginComponent {
 
             function goToToday() {
                 if (!ccalAvailable) return
+                showingMonthSelector = false
                 const today = new Date()
                 displayDate = today
                 selectedDate = today
@@ -135,8 +157,18 @@ PluginComponent {
             onDisplayDateChanged: {
                 currentMonthKey = ""
                 if (ccalAvailable) {
-                    ChineseCalendarService.loadMonthData(displayDate.getFullYear(), displayDate.getMonth())
-                    ChineseCalendarService.loadHolidayDataForYear(displayDate.getFullYear())
+                    const y = displayDate.getFullYear()
+                    const m = displayDate.getMonth()
+                    ChineseCalendarService.loadMonthData(y, m)
+                    ChineseCalendarService.loadHolidayDataForYear(y)
+                    // Preload adjacent months
+                    const prev = new Date(y, m - 1, 1)
+                    const next = new Date(y, m + 1, 1)
+                    ChineseCalendarService.loadMonthData(prev.getFullYear(), prev.getMonth())
+                    ChineseCalendarService.loadMonthData(next.getFullYear(), next.getMonth())
+                    // Preload adjacent year holidays for Dec/Jan
+                    if (m === 11) ChineseCalendarService.loadHolidayDataForYear(y + 1)
+                    if (m === 0) ChineseCalendarService.loadHolidayDataForYear(y - 1)
                 }
                 Qt.callLater(() => {
                     currentMonthKey = Qt.formatDate(displayDate, "yyyy-MM")
@@ -280,19 +312,51 @@ PluginComponent {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: popoutRoot.changeMonth(-1)
+                                onClicked: {
+                                    if (popoutRoot.showingMonthSelector) {
+                                        popoutRoot.selectorYear--
+                                    } else {
+                                        popoutRoot.changeMonth(-1)
+                                    }
+                                }
                             }
                         }
 
-                        StyledText {
+                        // F4: Month title - clickable for month selector
+                        Item {
                             width: parent.width - 56
                             height: 28
-                            text: popoutRoot.displayDate.toLocaleDateString(Qt.locale(), "MMMM yyyy")
-                            font.pixelSize: Theme.fontSizeMedium
-                            color: Theme.surfaceText
-                            font.weight: Font.Medium
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
+
+                            StyledText {
+                                anchors.fill: parent
+                                text: popoutRoot.showingMonthSelector
+                                    ? popoutRoot.selectorYear + " 年"
+                                    : popoutRoot.displayDate.toLocaleDateString(Qt.locale(), "MMMM yyyy")
+                                font.pixelSize: Theme.fontSizeMedium
+                                color: monthTitleArea.containsMouse ? Theme.primary : Theme.surfaceText
+                                font.weight: Font.Medium
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+
+                                Behavior on color {
+                                    ColorAnimation { duration: 150 }
+                                }
+                            }
+
+                            MouseArea {
+                                id: monthTitleArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (popoutRoot.showingMonthSelector) {
+                                        popoutRoot.showingMonthSelector = false
+                                    } else {
+                                        popoutRoot.selectorYear = popoutRoot.displayDate.getFullYear()
+                                        popoutRoot.showingMonthSelector = true
+                                    }
+                                }
+                            }
                         }
 
                         Rectangle {
@@ -313,13 +377,64 @@ PluginComponent {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: popoutRoot.changeMonth(1)
+                                onClicked: {
+                                    if (popoutRoot.showingMonthSelector) {
+                                        popoutRoot.selectorYear++
+                                    } else {
+                                        popoutRoot.changeMonth(1)
+                                    }
+                                }
                             }
                         }
                     }
 
-                    // Week day headers
+                    // F4: Month selector grid (4x3)
+                    Grid {
+                        id: monthSelectorGrid
+                        visible: popoutRoot.showingMonthSelector
+                        width: parent.width
+                        columns: 4
+                        rows: 3
+
+                        Repeater {
+                            model: 12
+
+                            Rectangle {
+                                readonly property bool isCurrentMonth: popoutRoot.selectorYear === popoutRoot.displayDate.getFullYear() && index === popoutRoot.displayDate.getMonth()
+                                width: monthSelectorGrid.width / 4
+                                height: 40
+                                radius: Theme.cornerRadius
+                                color: {
+                                    if (isCurrentMonth) return Theme.withAlpha(Theme.primary, 0.2)
+                                    if (monthSelArea.containsMouse) return Theme.withAlpha(Theme.primary, 0.08)
+                                    return "transparent"
+                                }
+
+                                StyledText {
+                                    anchors.centerIn: parent
+                                    text: (index + 1) + "月"
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    font.weight: isCurrentMonth ? Font.Bold : Font.Normal
+                                    color: isCurrentMonth ? Theme.primary : Theme.surfaceText
+                                }
+
+                                MouseArea {
+                                    id: monthSelArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        popoutRoot.displayDate = new Date(popoutRoot.selectorYear, index, 1)
+                                        popoutRoot.showingMonthSelector = false
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Week day headers (hidden in month selector mode)
                     Row {
+                        visible: !popoutRoot.showingMonthSelector
                         width: parent.width
                         height: 24
 
@@ -344,7 +459,8 @@ PluginComponent {
                                     anchors.centerIn: parent
                                     text: modelData
                                     font.pixelSize: Theme.fontSizeSmall
-                                    color: Theme.withAlpha(Theme.surfaceText, 0.5)
+                                    // F1: Weekend column header color
+                                    color: popoutRoot.isWeekendColumn(index) ? Theme.withAlpha(popoutRoot.weekendColor, 0.7) : Theme.withAlpha(Theme.surfaceText, 0.5)
                                     font.weight: Font.Medium
                                 }
                             }
@@ -353,124 +469,182 @@ PluginComponent {
 
                     // Spacing between week headers and calendar grid
                     Item {
+                        visible: !popoutRoot.showingMonthSelector
                         width: parent.width
                         height: 4
                     }
 
-                    // Calendar grid
-                    Grid {
-                        id: calendarGrid
+                    // F7: Wheel area wrapping calendar grid (hidden in month selector mode)
+                    Item {
+                        visible: !popoutRoot.showingMonthSelector
+                        width: parent.width
+                        height: calendarGrid.height
 
-                        property date displayDate: popoutRoot.displayDate
-                        property string displayMonthKey: popoutRoot.currentMonthKey ?? ""
-                        property int cacheVersion: ChineseCalendarService.dataVersion
-                        readonly property string todayDateString: new Date().toDateString()
-                        readonly property date firstDay: {
-                            if (!displayDate) return new Date()
-                            const firstOfMonth = new Date(displayDate.getFullYear(), displayDate.getMonth(), 1)
-                            return ChineseCalendarService.startOfWeek(firstOfMonth)
+                        Behavior on height {
+                            NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
                         }
 
-                        width: parent.width
-                        height: 240
-                        columns: 7
-                        rows: 6
-
-                        Repeater {
-                            model: 42
-
-                            Item {
-                                readonly property date dayDate: {
-                                    if (!parent.firstDay) return new Date()
-                                    const date = new Date(parent.firstDay)
-                                    date.setDate(date.getDate() + index)
-                                    return date
+                        MouseArea {
+                            anchors.fill: parent
+                            acceptedButtons: Qt.NoButton
+                            onWheel: (wheel) => {
+                                if (popoutRoot.wheelCooldown) return
+                                popoutRoot.wheelCooldown = true
+                                wheelCooldownTimer.restart()
+                                if (popoutRoot.showingMonthSelector) {
+                                    if (wheel.angleDelta.y > 0) popoutRoot.selectorYear--
+                                    else popoutRoot.selectorYear++
+                                } else {
+                                    if (wheel.angleDelta.y > 0) popoutRoot.changeMonth(-1)
+                                    else popoutRoot.changeMonth(1)
                                 }
-                                readonly property bool isCurrentMonth: dayDate.getMonth() === calendarGrid.displayDate.getMonth()
-                                readonly property bool isToday: dayDate.toDateString() === calendarGrid.todayDateString
-                                readonly property bool isSelected: dayDate.toDateString() === popoutRoot.selectedDate.toDateString()
-                                readonly property string dateStr: Qt.formatDate(dayDate, "yyyy-MM-dd")
-                                readonly property var holidayInfo: ChineseCalendarService.getHolidayInfo(dateStr)
-                                readonly property bool isHoliday: holidayInfo?.isHoliday || false
-                                readonly property bool isWorkday: holidayInfo?.isWorkday || false
-                                readonly property string lunarDayText: ChineseCalendarService.getLunarDayForDate(dayDate.getDate(), dayDate.getMonth(), dayDate.getFullYear(), calendarGrid.cacheVersion)
-                                readonly property string displayText: {
-                                    const holidayName = ChineseCalendarService.getHolidayName(dateStr)
-                                    if (holidayName) return holidayName
-                                    return lunarDayText
-                                }
-                                readonly property bool hasHoliday: displayText !== lunarDayText
+                            }
+                        }
 
-                                width: parent.width / 7
-                                height: parent.height / 6
+                        // Calendar grid
+                        Grid {
+                            id: calendarGrid
 
-                                Rectangle {
-                                    anchors.fill: parent
-                                    anchors.margins: 2
-                                    color: {
-                                        if (isSelected) {
-                                            return Theme.withAlpha(Theme.primary, 0.2)
-                                        } else if (isToday) {
-                                            return Theme.withAlpha(Theme.primary, 0.12)
-                                        } else if (isHoliday) {
-                                            return Theme.withAlpha(Theme.error, 0.15)
-                                        } else if (isWorkday) {
-                                            return Theme.withAlpha(popoutRoot.workdayColor, 0.12)
-                                        } else if (dayMouseArea.containsMouse) {
-                                            return Theme.withAlpha(Theme.primary, 0.06)
-                                        } else {
-                                            return "transparent"
-                                        }
+                            property date displayDate: popoutRoot.displayDate
+                            property string displayMonthKey: popoutRoot.currentMonthKey ?? ""
+                            property int cacheVersion: ChineseCalendarService.dataVersion
+                            readonly property string todayDateString: new Date().toDateString()
+                            readonly property date firstDay: {
+                                if (!displayDate) return new Date()
+                                const firstOfMonth = new Date(displayDate.getFullYear(), displayDate.getMonth(), 1)
+                                return ChineseCalendarService.startOfWeek(firstOfMonth)
+                            }
+
+                            // F5: Dynamic row count
+                            readonly property int cellHeight: 40
+                            readonly property int numRows: {
+                                if (!displayDate) return 6
+                                const y = displayDate.getFullYear()
+                                const m = displayDate.getMonth()
+                                const firstOfMonth = new Date(y, m, 1)
+                                const daysInMonth = new Date(y, m + 1, 0).getDate()
+                                const startOffset = (firstOfMonth.getDay() - ChineseCalendarService.weekStartJs() + 7) % 7
+                                return Math.ceil((startOffset + daysInMonth) / 7)
+                            }
+
+                            width: parent.width
+                            height: numRows * cellHeight
+                            columns: 7
+                            rows: numRows
+
+                            Repeater {
+                                model: calendarGrid.numRows * 7
+
+                                Item {
+                                    readonly property date dayDate: {
+                                        if (!calendarGrid.firstDay) return new Date()
+                                        const date = new Date(calendarGrid.firstDay)
+                                        date.setDate(date.getDate() + index)
+                                        return date
                                     }
-                                    radius: Theme.cornerRadius
-                                    border.width: isSelected ? 2 : 0
-                                    border.color: Theme.primary
-
-                                    Column {
-                                        anchors.centerIn: parent
-                                        spacing: hasHoliday ? 2 : 1
-
-                                        StyledText {
-                                            anchors.horizontalCenter: parent.horizontalCenter
-                                            text: dayDate.getDate()
-                                            font.pixelSize: Theme.fontSizeSmall
-                                            color: isToday ? Theme.primary : isCurrentMonth ? Theme.surfaceText : Theme.withAlpha(Theme.surfaceText, 0.4)
-                                            font.weight: isToday ? Font.Medium : Font.Normal
-                                        }
-
-                                        StyledText {
-                                            anchors.horizontalCenter: parent.horizontalCenter
-                                            text: {
-                                                if (displayText.includes("、")) {
-                                                    const parts = displayText.split("、")
-                                                    const shortened = parts.map(p => p.endsWith("节") && p.length > 2 ? p.slice(0, -1) : p)
-                                                    const joined = shortened.join("+")
-                                                    return joined.length > 5 ? shortened[0] : joined
-                                                }
-                                                return displayText
-                                            }
-                                            font.pixelSize: hasHoliday ? Theme.fontSizeSmall - 1 : Theme.fontSizeSmall
-                                            color: {
-                                                if (hasHoliday) {
-                                                    if (isHoliday) return Theme.error
-                                                    if (isWorkday) return popoutRoot.workdayColor
-                                                }
-                                                return Theme.withAlpha(Theme.primary, isCurrentMonth ? 0.8 : 0.5)
-                                            }
-                                            visible: isCurrentMonth && text !== ""
-                                            font.weight: hasHoliday ? Font.Medium : Font.Normal
-                                            maximumLineCount: 1
-                                            elide: Text.ElideRight
-                                        }
+                                    readonly property bool isCurrentMonth: dayDate.getMonth() === calendarGrid.displayDate.getMonth()
+                                    readonly property bool isToday: dayDate.toDateString() === calendarGrid.todayDateString
+                                    readonly property bool isSelected: dayDate.toDateString() === popoutRoot.selectedDate.toDateString()
+                                    readonly property string dateStr: Qt.formatDate(dayDate, "yyyy-MM-dd")
+                                    readonly property var holidayInfo: ChineseCalendarService.getHolidayInfo(dateStr)
+                                    readonly property bool isHoliday: holidayInfo?.isHoliday || false
+                                    readonly property bool isWorkday: holidayInfo?.isWorkday || false
+                                    // F1: Weekend per cell
+                                    readonly property bool isWeekend: popoutRoot.isWeekendColumn(index % 7)
+                                    readonly property string lunarDayText: ChineseCalendarService.getLunarDayForDate(dayDate.getDate(), dayDate.getMonth(), dayDate.getFullYear(), calendarGrid.cacheVersion)
+                                    readonly property string displayText: {
+                                        const holidayName = ChineseCalendarService.getHolidayName(dateStr)
+                                        if (holidayName) return holidayName
+                                        return lunarDayText
                                     }
+                                    readonly property bool hasHoliday: displayText !== lunarDayText
 
-                                    MouseArea {
-                                        id: dayMouseArea
+                                    width: calendarGrid.width / 7
+                                    height: calendarGrid.cellHeight
+
+                                    Rectangle {
                                         anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            popoutRoot.selectDate(dayDate)
+                                        anchors.margins: 2
+                                        color: {
+                                            if (isSelected) {
+                                                return Theme.withAlpha(Theme.primary, 0.2)
+                                            } else if (isToday) {
+                                                return Theme.withAlpha(Theme.primary, 0.12)
+                                            } else if (isHoliday) {
+                                                return Theme.withAlpha(Theme.error, 0.15)
+                                            } else if (isWorkday) {
+                                                return Theme.withAlpha(popoutRoot.workdayColor, 0.12)
+                                            } else if (dayMouseArea.containsMouse) {
+                                                return Theme.withAlpha(Theme.primary, 0.06)
+                                            // F1: Weekend background tint (current month only)
+                                            } else if (isWeekend && isCurrentMonth) {
+                                                return Theme.withAlpha(Theme.error, 0.04)
+                                            } else {
+                                                return "transparent"
+                                            }
+                                        }
+                                        radius: Theme.cornerRadius
+                                        border.width: isSelected ? 2 : 0
+                                        border.color: Theme.primary
+
+                                        Column {
+                                            anchors.centerIn: parent
+                                            spacing: hasHoliday ? 2 : 1
+
+                                            StyledText {
+                                                anchors.horizontalCenter: parent.horizontalCenter
+                                                text: dayDate.getDate()
+                                                font.pixelSize: Theme.fontSizeSmall
+                                                color: {
+                                                    if (isToday) return Theme.primary
+                                                    if (!isCurrentMonth) return Theme.withAlpha(Theme.surfaceText, 0.4)
+                                                    // F1: Weekend date number color (don't override today/holiday/workday)
+                                                    if (isWeekend && !isHoliday && !isWorkday) return Theme.withAlpha(popoutRoot.weekendColor, 0.8)
+                                                    return Theme.surfaceText
+                                                }
+                                                font.weight: isToday ? Font.Medium : Font.Normal
+                                            }
+
+                                            StyledText {
+                                                anchors.horizontalCenter: parent.horizontalCenter
+                                                text: {
+                                                    if (displayText.includes("、")) {
+                                                        const parts = displayText.split("、")
+                                                        const shortened = parts.map(p => p.endsWith("节") && p.length > 2 ? p.slice(0, -1) : p)
+                                                        const joined = shortened.join("+")
+                                                        return joined.length > 5 ? shortened[0] : joined
+                                                    }
+                                                    return displayText
+                                                }
+                                                font.pixelSize: hasHoliday ? Theme.fontSizeSmall - 1 : Theme.fontSizeSmall
+                                                color: {
+                                                    // F2: Non-current-month lunar colors with lower opacity
+                                                    if (hasHoliday) {
+                                                        if (isHoliday) return isCurrentMonth ? Theme.error : Theme.withAlpha(Theme.error, 0.4)
+                                                        if (isWorkday) return isCurrentMonth ? popoutRoot.workdayColor : Theme.withAlpha(popoutRoot.workdayColor, 0.4)
+                                                    }
+                                                    return Theme.withAlpha(Theme.primary, isCurrentMonth ? 0.8 : 0.35)
+                                                }
+                                                // F2: Show lunar text for non-current-month dates too
+                                                visible: text !== ""
+                                                font.weight: hasHoliday ? Font.Medium : Font.Normal
+                                                maximumLineCount: 1
+                                                elide: Text.ElideRight
+                                            }
+                                        }
+
+                                        MouseArea {
+                                            id: dayMouseArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                popoutRoot.selectDate(dayDate)
+                                                // F10: Jump to that month if not current month
+                                                if (!isCurrentMonth) {
+                                                    popoutRoot.displayDate = new Date(dayDate.getFullYear(), dayDate.getMonth(), 1)
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -512,6 +686,7 @@ PluginComponent {
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
 
+                            // F3: Main info text (without solar term inline)
                             StyledText {
                                 text: {
                                     const date = popoutRoot.selectedDate
@@ -531,11 +706,7 @@ PluginComponent {
 
                                     const fullInfo = ChineseCalendarService.getFullLunarDateInfo(date.getDate(), date.getMonth(), date.getFullYear())
                                     if (fullInfo) {
-                                        let lunarText = fullInfo.fullLunarDate
-                                        if (fullInfo.solarTerm) {
-                                            lunarText += " · " + fullInfo.solarTerm
-                                        }
-                                        return prefix + "是农历 " + lunarText
+                                        return prefix + "是农历 " + fullInfo.fullLunarDate
                                     }
 
                                     if (lunarDay) {
@@ -555,10 +726,45 @@ PluginComponent {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 visible: text !== ""
                             }
+
+                            // F3: Solar term display (bold, primary color)
+                            StyledText {
+                                text: {
+                                    const date = popoutRoot.selectedDate
+                                    const fullInfo = ChineseCalendarService.getFullLunarDateInfo(date.getDate(), date.getMonth(), date.getFullYear())
+                                    if (fullInfo && fullInfo.solarTerm) return "节气：" + fullInfo.solarTerm
+                                    return ""
+                                }
+                                font.pixelSize: Theme.fontSizeSmall
+                                font.weight: Font.Bold
+                                color: Theme.primary
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                visible: text !== ""
+                            }
+
+                            // F3: Holiday countdown
+                            StyledText {
+                                readonly property var nextHoliday: {
+                                    // Depend on holidayDataVersion for reactivity
+                                    const v = ChineseCalendarService.holidayDataVersion
+                                    return ChineseCalendarService.getNextHoliday(popoutRoot.selectedDate)
+                                }
+                                readonly property bool selectedIsHoliday: {
+                                    const dateStr = Qt.formatDate(popoutRoot.selectedDate, "yyyy-MM-dd")
+                                    const info = ChineseCalendarService.getHolidayInfo(dateStr)
+                                    return info?.isHoliday || false
+                                }
+                                text: nextHoliday && !selectedIsHoliday ? "距 " + nextHoliday.name + " 还有 " + nextHoliday.daysUntil + " 天" : ""
+                                font.pixelSize: Theme.fontSizeSmall
+                                color: Theme.withAlpha(Theme.surfaceText, 0.7)
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                visible: text !== ""
+                            }
                         }
                     }
                 }
 
+                // F6: "今" FAB with hover feedback
                 Rectangle {
                     id: fab
                     width: 48
@@ -566,6 +772,11 @@ PluginComponent {
                     radius: width / 2
                     color: Theme.primary
                     visible: ccalAvailable && !popoutRoot.isShowingToday
+                    scale: fabMouseArea.containsMouse ? 1.08 : 1.0
+
+                    Behavior on scale {
+                        NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+                    }
 
                     anchors {
                         right: parent.right
@@ -577,10 +788,20 @@ PluginComponent {
                     layer.effect: DropShadow {
                         transparentBorder: true
                         horizontalOffset: 0
-                        verticalOffset: 2
-                        radius: 8
+                        verticalOffset: fabMouseArea.containsMouse ? 4 : 2
+                        radius: fabMouseArea.containsMouse ? 12 : 8
                         samples: 16
-                        color: "#40000000"
+                        color: fabMouseArea.containsMouse ? "#60000000" : "#40000000"
+
+                        Behavior on verticalOffset {
+                            NumberAnimation { duration: 150 }
+                        }
+                        Behavior on radius {
+                            NumberAnimation { duration: 150 }
+                        }
+                        Behavior on color {
+                            ColorAnimation { duration: 150 }
+                        }
                     }
 
                     Behavior on opacity {
@@ -596,6 +817,7 @@ PluginComponent {
                     }
 
                     MouseArea {
+                        id: fabMouseArea
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
@@ -606,8 +828,17 @@ PluginComponent {
 
             Component.onCompleted: {
                 if (ccalAvailable) {
-                    ChineseCalendarService.loadMonthData(displayDate.getFullYear(), displayDate.getMonth())
-                    ChineseCalendarService.loadHolidayDataForYear(displayDate.getFullYear())
+                    const y = displayDate.getFullYear()
+                    const m = displayDate.getMonth()
+                    ChineseCalendarService.loadMonthData(y, m)
+                    ChineseCalendarService.loadHolidayDataForYear(y)
+                    // Preload adjacent months
+                    const prev = new Date(y, m - 1, 1)
+                    const next = new Date(y, m + 1, 1)
+                    ChineseCalendarService.loadMonthData(prev.getFullYear(), prev.getMonth())
+                    ChineseCalendarService.loadMonthData(next.getFullYear(), next.getMonth())
+                    if (m === 11) ChineseCalendarService.loadHolidayDataForYear(y + 1)
+                    if (m === 0) ChineseCalendarService.loadHolidayDataForYear(y - 1)
                 }
                 updateShowingToday()
             }

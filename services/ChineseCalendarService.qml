@@ -243,6 +243,9 @@ Singleton {
         if (!ccalAvailable) return
 
         const monthKey = year + "-" + (month + 1).toString().padStart(2, "0")
+
+        // Cache hit check - skip if already loaded
+        if (lunarDataCache[monthKey]) return
         const args = ["-x", "-g", "-u", (month + 1).toString(), year.toString()]
 
         const fetchMonthKey = monthKey
@@ -325,6 +328,30 @@ Singleton {
         const cache = lunarDataCache[monthKey]
         if (!cache || !cache.days) return null
         return cache.days[dayKey] || null
+    }
+
+    // Get next holiday from a given date
+    function getNextHoliday(fromDate) {
+        if (!fromDate) return null
+        const from = new Date(fromDate)
+        from.setHours(0, 0, 0, 0)
+        let closest = null
+        let closestDays = Infinity
+
+        const keys = Object.keys(holidayData)
+        for (let i = 0; i < keys.length; i++) {
+            const info = holidayData[keys[i]]
+            if (!info.isHoliday) continue
+            const parts = keys[i].split("-")
+            const hDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
+            hDate.setHours(0, 0, 0, 0)
+            const diff = Math.round((hDate - from) / (1000 * 60 * 60 * 24))
+            if (diff > 0 && diff < closestDays) {
+                closestDays = diff
+                closest = { name: info.name, daysUntil: diff }
+            }
+        }
+        return closest
     }
 
     // Calendar helper functions

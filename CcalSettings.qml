@@ -3,6 +3,7 @@ import qs.Common
 import qs.Widgets
 import qs.Modules.Plugins
 import qs.Services
+import "./components"
 
 PluginSettings {
     id: root
@@ -76,18 +77,39 @@ PluginSettings {
                 ]
 
                 Rectangle {
+                    readonly property string previewText: {
+                        const v = ChineseCalendarService.dataVersion
+                        if (ChineseCalendarService.ccalAvailable) {
+                            return ChineseCalendarService.formatDate(modelData.format)
+                        }
+                        return modelData.format
+                    }
+
                     width: (parent.width - Theme.spacingS * 3) / 4
-                    height: 32
+                    height: 48
                     radius: Theme.cornerRadius
                     color: mouseArea.containsMouse ? Theme.withAlpha(Theme.primary, 0.1) : Theme.surfaceContainerHigh
                     border.width: 1
                     border.color: Theme.outlineVariant
 
-                    StyledText {
+                    Column {
                         anchors.centerIn: parent
-                        text: modelData.label
-                        font.pixelSize: Theme.fontSizeSmall
-                        color: Theme.surfaceText
+                        spacing: 2
+
+                        StyledText {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: previewText
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: Theme.primary
+                            font.weight: Font.Medium
+                        }
+
+                        StyledText {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: modelData.format
+                            font.pixelSize: Theme.fontSizeSmall - 2
+                            color: Theme.withAlpha(Theme.surfaceVariantText, 0.7)
+                        }
                     }
 
                     MouseArea {
