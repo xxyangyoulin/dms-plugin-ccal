@@ -1,0 +1,18 @@
+{
+    "id": "chineseCalendar",
+    "name": "Chinese Calendar",
+    "description": "Display Chinese lunar calendar with holiday information in the status bar",
+    "version": "1.2.0",
+    "author": "xxyangyoulin",
+    "component": "./CcalWidget.qml",
+    "icon": "calendar_month",
+    "settings": "./CcalSettings.qml",
+    "requires_dms": ">=1.4.0",
+    "license": "MIT",
+    "permissions": [
+        "settings_read",
+        "settings_write",
+        "process",
+        "network"
+    ]
+}

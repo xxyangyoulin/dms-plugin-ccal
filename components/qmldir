@@ -1,0 +1,2 @@
+singleton ChineseCalendarService 1.0 ../services/ChineseCalendarService.qml
+LunarCalendarPopup 1.0 LunarCalendarPopup.qml
