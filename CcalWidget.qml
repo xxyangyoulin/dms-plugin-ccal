@@ -584,7 +584,7 @@ PluginComponent {
                                             }
                                         }
                                         radius: Theme.cornerRadius
-                                        border.width: isSelected ? 2 : 0
+                                        border.width: isSelected ? 1 : 0
                                         border.color: Theme.primary
 
                                         Column {
