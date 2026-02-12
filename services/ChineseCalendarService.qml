@@ -47,7 +47,6 @@ Singleton {
         repeat: true
         triggeredOnStart: true
         onTriggered: {
-            // console.info("[ChineseCalendarService] Timer triggered, loading current month data...")
             if (ccalAvailable) {
                 loadCurrentMonthData()
                 loadHolidayData()
@@ -122,7 +121,7 @@ Singleton {
                     parseHolidayResponse(fetchYear, stdout)
                 } else {
                     holidayLoading = false
-                    // console.info("Failed to fetch holiday data for year:", fetchYear)
+                    console.warn("[ChineseCalendarService] Failed to fetch holiday data for year:", fetchYear)
                 }
             }, 50, 15000)
     }
@@ -203,7 +202,7 @@ Singleton {
                 holidayDataVersion++
             }
         } catch (e) {
-            // console.info("Error parsing holiday data:", e)
+            console.warn("[ChineseCalendarService] Error parsing holiday data:", e)
         }
     }
 
@@ -250,17 +249,15 @@ Singleton {
         Proc.runCommand("ccal-" + fetchMonthKey,
             [ccalPath].concat(args),
             (stdout, exitCode) => {
-                // console.info("[ChineseCalendarService] ccal callback for", fetchMonthKey, "exitCode:", exitCode)
                 if (exitCode === 0) {
                     parseCcalOutput(fetchMonthKey, stdout)
                 } else {
-                    // console.error("[ChineseCalendarService] ccal command failed for:", fetchMonthKey, "exitCode:", exitCode)
+                    console.warn("[ChineseCalendarService] ccal command failed for:", fetchMonthKey, "exitCode:", exitCode)
                 }
             }, 50)
     }
 
     function parseCcalOutput(monthKey, output) {
-        // console.info("[ChineseCalendarService] parseCcalOutput for", monthKey, "output length:", output.length)
         const monthData = {
             days: {},
             monthInfo: {}
@@ -304,15 +301,11 @@ Singleton {
 
         const today = new Date()
         const currentMonthKey = today.getFullYear() + "-" + (today.getMonth() + 1).toString().padStart(2, "0")
-        // console.info("[ChineseCalendarService] parseCcalOutput checking:", monthKey, "vs", currentMonthKey)
         if (monthKey === currentMonthKey) {
             const dayKey = today.getDate().toString()
             const lunarDay = monthData.days[dayKey]?.lunarDay || ""
-            // console.info("[ChineseCalendarService] parseCcalOutput MATCH! dayKey:", dayKey, "lunarDay:", lunarDay)
             currentLunarDay = lunarDay
             currentLunarInfo = monthData.monthInfo.header || ""
-        } else {
-            // console.info("[ChineseCalendarService] parseCcalOutput NO MATCH, not setting currentLunarDay")
         }
     }
 
