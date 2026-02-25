@@ -742,21 +742,35 @@ PluginComponent {
                                 visible: text !== ""
                             }
 
-                            // F3: Holiday countdown
+                            // F3: Holiday countdown / remaining days
                             StyledText {
-                                readonly property var nextHoliday: {
+                                readonly property var holidayStatus: {
                                     // Depend on holidayDataVersion for reactivity
                                     const v = ChineseCalendarService.holidayDataVersion
-                                    return ChineseCalendarService.getNextHoliday(popoutRoot.selectedDate)
+                                    return ChineseCalendarService.getHolidayStatus(popoutRoot.selectedDate)
                                 }
-                                readonly property bool selectedIsHoliday: {
-                                    const dateStr = Qt.formatDate(popoutRoot.selectedDate, "yyyy-MM-dd")
-                                    const info = ChineseCalendarService.getHolidayInfo(dateStr)
-                                    return info?.isHoliday || false
+                                text: {
+                                    if (!holidayStatus) return ""
+
+                                    if (holidayStatus.inHoliday) {
+                                        // In holiday, show remaining days
+                                        if (holidayStatus.remainingDays > 0) {
+                                            return holidayStatus.holidayName + "假期，剩余 " + holidayStatus.remainingDays + " 天"
+                                        } else {
+                                            return holidayStatus.holidayName + "假期最后一天"
+                                        }
+                                    } else if (holidayStatus.daysUntil !== undefined) {
+                                        // Not in holiday, show days until next holiday
+                                        return "距 " + holidayStatus.name + " 还有 " + holidayStatus.daysUntil + " 天"
+                                    }
+                                    return ""
                                 }
-                                text: nextHoliday && !selectedIsHoliday ? "距 " + nextHoliday.name + " 还有 " + nextHoliday.daysUntil + " 天" : ""
                                 font.pixelSize: Theme.fontSizeSmall
-                                color: Theme.withAlpha(Theme.surfaceText, 0.7)
+                                color: {
+                                    if (holidayStatus?.inHoliday) return Theme.error
+                                    return Theme.withAlpha(Theme.surfaceText, 0.7)
+                                }
+                                font.weight: holidayStatus?.inHoliday ? Font.Medium : Font.Normal
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 visible: text !== ""
                             }

@@ -354,6 +354,46 @@ Singleton {
         return closest
     }
 
+    // Get current holiday info: if in holiday, return remaining days; otherwise return next holiday
+    function getHolidayStatus(fromDate) {
+        if (!fromDate) return null
+        const from = new Date(fromDate)
+        from.setHours(0, 0, 0, 0)
+        const fromStr = Qt.formatDate(from, "yyyy-MM-dd")
+
+        // Check if current date is a holiday
+        const currentInfo = holidayData[fromStr]
+        if (currentInfo && currentInfo.isHoliday) {
+            // Find the end of this holiday period
+            // A holiday period continues while the next days are also holidays or have no wage info (assuming continuation)
+            // We need to find consecutive holidays
+            let remainingDays = 0
+            let checkDate = new Date(from)
+
+            while (true) {
+                checkDate.setDate(checkDate.getDate() + 1)
+                const checkStr = Qt.formatDate(checkDate, "yyyy-MM-dd")
+                const checkInfo = holidayData[checkStr]
+
+                if (checkInfo && checkInfo.isHoliday) {
+                    remainingDays++
+                } else {
+                    break
+                }
+            }
+
+            return {
+                inHoliday: true,
+                holidayName: currentInfo.name,
+                remainingDays: remainingDays,
+                totalDays: remainingDays + 1 // including today
+            }
+        }
+
+        // Not in holiday, get next holiday
+        return getNextHoliday(fromDate)
+    }
+
     // Calendar helper functions
     function weekStartJs() {
         return Qt.locale().firstDayOfWeek % 7
