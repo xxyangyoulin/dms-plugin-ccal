@@ -48,7 +48,7 @@ Singleton {
         triggeredOnStart: true
         onTriggered: {
             if (ccalAvailable) {
-                loadCurrentMonthData()
+                refreshCurrentDayInfo()
                 loadHolidayData()
             }
         }
@@ -239,13 +239,35 @@ Singleton {
         loadMonthData(today.getFullYear(), today.getMonth())
     }
 
-    function loadMonthData(year, month) {
+    // Refresh current day's lunar info without cache check (for timer updates)
+    function refreshCurrentDayInfo() {
+        const today = new Date()
+        const year = today.getFullYear()
+        const month = today.getMonth()
+        const day = today.getDate()
+        const monthKey = year + "-" + (month + 1).toString().padStart(2, "0")
+        const dayKey = day.toString()
+
+        // Check if cache exists and update currentLunarDay from it
+        const cache = lunarDataCache[monthKey]
+        if (cache && cache.days && cache.days[dayKey]) {
+            currentLunarDay = cache.days[dayKey].lunarDay || ""
+            currentLunarInfo = cache.monthInfo.header || ""
+            // Trigger update signal to refresh UI
+            lunarDataUpdated()
+        } else {
+            // If no cache for current day, load it
+            loadMonthData(year, month, true)
+        }
+    }
+
+    function loadMonthData(year, month, forceRefresh) {
         if (!ccalAvailable) return
 
         const monthKey = year + "-" + (month + 1).toString().padStart(2, "0")
 
-        // Cache hit check - skip if already loaded
-        if (lunarDataCache[monthKey]) return
+        // Cache hit check - skip if already loaded (unless force refresh)
+        if (!forceRefresh && lunarDataCache[monthKey]) return
         const args = ["-x", "-g", "-u", (month + 1).toString(), year.toString()]
 
         const fetchMonthKey = monthKey
