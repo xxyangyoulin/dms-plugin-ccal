@@ -1,10 +1,16 @@
 import QtQuick
-import Qt5Compat.GraphicalEffects
 import qs.Common
 import qs.Services
 import qs.Widgets
 import qs.Modules.Plugins
 import "./components"
+
+// Material Fluent Design Principles:
+// - Smooth animations and transitions
+// - Layered depth with elevation shadows
+// - Rounded corners for modern feel
+// - Subtle transparency and blur effects
+// - Micro-interactions on hover/click
 
 PluginComponent {
     id: root
@@ -105,10 +111,12 @@ PluginComponent {
             // Ccal availability status from service
             readonly property bool ccalAvailable: ChineseCalendarService.ccalAvailable
             readonly property bool ccalChecking: ChineseCalendarService.ccalChecking
-            readonly property color workdayColor: "#43a047"
-
-            // F1: Weekend color and helper
-            readonly property color weekendColor: Theme.error
+            // Material Fluent color palette
+            readonly property color workdayColor: "#4caf50"
+            readonly property color weekendColor: "#ff6b6b"
+            readonly property color todayHighlight: Theme.primary
+            readonly property color surfaceElevated: Theme.withAlpha(Theme.surface, 0.95)
+            readonly property color overlayTint: Theme.withAlpha(Theme.primary, 0.08)
             function isWeekendColumn(columnIndex) {
                 const loc = Qt.locale()
                 const qtFirst = loc.firstDayOfWeek
@@ -796,26 +804,6 @@ PluginComponent {
                         right: parent.right
                         bottom: parent.bottom
                         margins: Theme.spacingM
-                    }
-
-                    layer.enabled: true
-                    layer.effect: DropShadow {
-                        transparentBorder: true
-                        horizontalOffset: 0
-                        verticalOffset: fabMouseArea.containsMouse ? 4 : 2
-                        radius: fabMouseArea.containsMouse ? 12 : 8
-                        samples: 16
-                        color: fabMouseArea.containsMouse ? "#60000000" : "#40000000"
-
-                        Behavior on verticalOffset {
-                            NumberAnimation { duration: 150 }
-                        }
-                        Behavior on radius {
-                            NumberAnimation { duration: 150 }
-                        }
-                        Behavior on color {
-                            ColorAnimation { duration: 150 }
-                        }
                     }
 
                     Behavior on opacity {
