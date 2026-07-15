@@ -111,9 +111,8 @@ PluginComponent {
             // Ccal availability status from service
             readonly property bool ccalAvailable: ChineseCalendarService.ccalAvailable
             readonly property bool ccalChecking: ChineseCalendarService.ccalChecking
-            // Material Fluent color palette
-            readonly property color workdayColor: "#4caf50"
-            readonly property color weekendColor: "#ff6b6b"
+            readonly property color workdayColor: Theme.success
+            readonly property color weekendColor: Theme.error
             readonly property color todayHighlight: Theme.primary
             readonly property color surfaceElevated: Theme.withAlpha(Theme.surface, 0.95)
             readonly property color overlayTint: Theme.withAlpha(Theme.primary, 0.08)
