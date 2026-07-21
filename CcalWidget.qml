@@ -670,7 +670,7 @@ PluginComponent {
                         width: parent.width
                         height: infoCol.height + Theme.spacingM
                         radius: Theme.cornerRadius
-                        color: Theme.withAlpha(Theme.surfaceContainerHigh, 0.8)
+                        color: Theme.withAlpha(Theme.surfaceContainerHigh, 0.3)
                         border.width: 1
                         border.color: Theme.withAlpha(Theme.outlineVariant, 0.3)
 
