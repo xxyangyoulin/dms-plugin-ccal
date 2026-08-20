@@ -515,7 +515,18 @@ PluginComponent {
                             property date displayDate: popoutRoot.displayDate
                             property string displayMonthKey: popoutRoot.currentMonthKey ?? ""
                             property int cacheVersion: ChineseCalendarService.dataVersion
-                            readonly property string todayDateString: new Date().toDateString()
+                            property int currentMinute: 0
+                            readonly property string todayDateString: {
+                                const minute = currentMinute
+                                return new Date().toDateString()
+                            }
+                            Timer {
+                                interval: 60000
+                                running: true
+                                repeat: true
+                                triggeredOnStart: true
+                                onTriggered: calendarGrid.currentMinute++
+                            }
                             readonly property date firstDay: {
                                 if (!displayDate) return new Date()
                                 const firstOfMonth = new Date(displayDate.getFullYear(), displayDate.getMonth(), 1)
