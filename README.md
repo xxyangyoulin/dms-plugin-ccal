@@ -42,7 +42,7 @@ yay -S ccal
 This project is based on and powered by:
 
 - **[ccal](http://ccal.chinesebay.com/ccal/ccal.htm)**: Provides the core lunar calendar calculation engine.
-- **[hodiday](https://github.com/tomandjerry136/hodiday)**: Provides the holiday arrangement data source.
+- **[holiday-cn](https://github.com/NateScarlet/holiday-cn)**: Provides the holiday arrangement data source.
 
 ## Feedback & Contributions
 

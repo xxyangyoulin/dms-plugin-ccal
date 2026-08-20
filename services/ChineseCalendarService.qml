@@ -115,7 +115,7 @@ Singleton {
         holidayLoading = true
         const fetchYear = yearKey
         Proc.runCommand("holiday-" + fetchYear,
-            ["curl", "-s", "https://raw.githubusercontent.com/NateScarlet/holiday-cn/master/" + year + ".json"],
+            ["curl", "-sS", "--connect-timeout", "5", "--max-time", "10", "https://raw.githubusercontent.com/NateScarlet/holiday-cn/master/" + year + ".json"],
             (stdout, exitCode) => {
                 if (exitCode === 0) {
                     parseHolidayResponse(fetchYear, stdout)

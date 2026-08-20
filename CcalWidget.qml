@@ -525,7 +525,10 @@ PluginComponent {
                                 running: true
                                 repeat: true
                                 triggeredOnStart: true
-                                onTriggered: calendarGrid.currentMinute++
+                                onTriggered: {
+                                    calendarGrid.currentMinute++
+                                    popoutRoot.updateShowingToday()
+                                }
                             }
                             readonly property date firstDay: {
                                 if (!displayDate) return new Date()
@@ -564,7 +567,10 @@ PluginComponent {
                                     readonly property bool isToday: dayDate.toDateString() === calendarGrid.todayDateString
                                     readonly property bool isSelected: dayDate.toDateString() === popoutRoot.selectedDate.toDateString()
                                     readonly property string dateStr: Qt.formatDate(dayDate, "yyyy-MM-dd")
-                                    readonly property var holidayInfo: ChineseCalendarService.getHolidayInfo(dateStr)
+                                    readonly property var holidayInfo: {
+                                        const version = ChineseCalendarService.holidayDataVersion
+                                        return ChineseCalendarService.getHolidayInfo(dateStr)
+                                    }
                                     readonly property bool isHoliday: holidayInfo?.isHoliday || false
                                     readonly property bool isWorkday: holidayInfo?.isWorkday || false
                                     // F1: Weekend per cell
