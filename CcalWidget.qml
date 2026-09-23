@@ -161,12 +161,12 @@ PluginComponent {
                 )
             }
 
-            // Reset to today when the popout closes, so it always opens on the current date
+            // Refresh the current date whenever the popout opens.
             Connections {
                 target: popoutRoot.parentPopout
                 enabled: popoutRoot.parentPopout !== null
                 function onShouldBeVisibleChanged() {
-                    if (popoutRoot.parentPopout && !popoutRoot.parentPopout.shouldBeVisible && !popoutRoot.isShowingToday) {
+                    if (popoutRoot.parentPopout && popoutRoot.parentPopout.shouldBeVisible) {
                         popoutRoot.goToToday()
                     }
                 }
