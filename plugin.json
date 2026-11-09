@@ -2,7 +2,7 @@
     "id": "chineseCalendar",
     "name": "Chinese Calendar",
     "description": "Display Chinese lunar calendar and holiday information in DankBar and DDash",
-    "version": "2.0.0",
+    "version": "2.0.1",
     "author": "xxyangyoulin",
     "type": "composite",
     "components": {

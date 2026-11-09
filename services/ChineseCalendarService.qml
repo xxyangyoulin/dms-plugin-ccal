@@ -28,8 +28,13 @@ Singleton {
     property var holidayData: ({})
     property int holidayDataVersion: 0
     property bool holidayLoading: false
+    property var holidayFetchInProgress: ({})
     property var holidayCacheTimestamp: ({})
     readonly property int cacheExpireDays: 7
+    // Prefetch backoff: next-year holiday data is usually published Oct-Nov,
+    // retry at most every 6 hours while it is not available yet
+    property var holidayFetchFailedAt: ({})
+    readonly property int prefetchRetryHours: 6
 
     // Chinese numbers for lunar day display
     readonly property var chineseNums: ["", "初一", "初二", "初三", "初四", "初五", "初六", "初七", "初八", "初九", "初十",
@@ -81,21 +86,39 @@ Singleton {
         checkCcalAvailability()
     }
 
-    // Load holiday data for current year with caching
+    // Load holiday data for current year with caching.
+    // From October on, also prefetch next year's data so upcoming holidays
+    // (e.g. New Year's Day) show up on the card as soon as they are published.
     function loadHolidayData() {
         const today = new Date()
         const year = today.getFullYear()
-        loadHolidayDataForYear(year)
+        loadHolidayDataForYear(year, true)
+        if (today.getMonth() >= 9)
+            loadHolidayDataForYear(year + 1, true)
     }
 
-    // Load holiday data for a specific year
-    function loadHolidayDataForYear(year) {
+    // Load holiday data for a specific year.
+    // isPrefetch=true applies a retry backoff while the data is not published
+    // yet (404 from holiday-cn); user-triggered loads skip the backoff.
+    function loadHolidayDataForYear(year, isPrefetch) {
         const yearKey = year.toString()
+        if (holidayFetchInProgress[yearKey]) return
 
         // Check if we already have data in memory
-        if (holidayCache[yearKey]) {
+        if (holidayCache[yearKey] && holidayCache[yearKey].length > 0) {
             if (isCacheValid(yearKey)) {
                 return
+            }
+        }
+
+        // Back off between prefetch retries while next-year data is absent
+        if (isPrefetch) {
+            const failedAt = holidayFetchFailedAt[yearKey]
+            if (failedAt) {
+                const hoursDiff = (Date.now() - failedAt) / (1000 * 60 * 60)
+                if (hoursDiff < prefetchRetryHours) {
+                    return
+                }
             }
         }
 
@@ -113,17 +136,33 @@ Singleton {
 
         // Fetch from API
         holidayLoading = true
-        const fetchYear = yearKey
-        Proc.runCommand("holiday-" + fetchYear,
-            ["curl", "-sS", "--connect-timeout", "5", "--max-time", "10", "https://raw.githubusercontent.com/NateScarlet/holiday-cn/master/" + year + ".json"],
-            (stdout, exitCode) => {
-                if (exitCode === 0) {
-                    parseHolidayResponse(fetchYear, stdout)
-                } else {
-                    holidayLoading = false
-                    console.warn("[ChineseCalendarService] Failed to fetch holiday data for year:", fetchYear)
-                }
-            }, 50, 15000)
+        holidayFetchInProgress[yearKey] = true
+        const urls = [
+            "https://raw.githubusercontent.com/NateScarlet/holiday-cn/master/" + yearKey + ".json",
+            "https://cdn.jsdelivr.net/gh/NateScarlet/holiday-cn@master/" + yearKey + ".json",
+            "https://fastly.jsdelivr.net/gh/NateScarlet/holiday-cn@master/" + yearKey + ".json"
+        ]
+        function fetchSource(index) {
+            const url = urls[index]
+            Proc.runCommand("holiday-" + yearKey + "-" + index,
+                ["curl", "-fsS", "--connect-timeout", "5", "--max-time", "10", url],
+                (stdout, exitCode) => {
+                    if (exitCode === 0 && parseHolidayResponse(yearKey, stdout)) {
+                        console.info("[ChineseCalendarService] Loaded holiday data:", url)
+                    } else {
+                        console.warn("[ChineseCalendarService] Holiday source failed:", url,
+                            exitCode === 0 ? "empty or invalid data" : "curl exit code " + exitCode)
+                        if (index + 1 < urls.length) {
+                            fetchSource(index + 1)
+                            return
+                        }
+                        holidayFetchFailedAt[yearKey] = Date.now()
+                    }
+                    delete holidayFetchInProgress[yearKey]
+                    holidayLoading = Object.keys(holidayFetchInProgress).length > 0
+                }, 50, 15000)
+        }
+        fetchSource(0)
     }
 
     // Check if cache is valid (within 7 days)
@@ -145,7 +184,7 @@ Singleton {
         for (let i = 0; i < years.length; i++) {
             const yearKey = years[i]
             const cached = loadHolidayDataFromCache(yearKey)
-            if (cached && cached.data && cached.data.days) {
+            if (cached && cached.data && cached.data.days && cached.data.days.length > 0) {
                 holidayCache[yearKey] = cached.data.days
                 holidayCacheTimestamp[yearKey] = cached.timestamp
                 processHolidayDataCn(cached.data.days)
@@ -192,18 +231,20 @@ Singleton {
 
     // Parse holiday API response (holiday-cn format)
     function parseHolidayResponse(yearKey, responseText) {
-        holidayLoading = false
         try {
             const response = JSON.parse(responseText)
-            if (response.days) {
+            if (Array.isArray(response.days) && response.days.length > 0) {
                 holidayCache[yearKey] = response.days
                 processHolidayDataCn(response.days)
                 saveHolidayDataToCache(yearKey, response)
                 holidayDataVersion++
+                delete holidayFetchFailedAt[yearKey]
+                return true
             }
         } catch (e) {
             console.warn("[ChineseCalendarService] Error parsing holiday data:", e)
         }
+        return false
     }
 
     // Process holiday data from holiday-cn format

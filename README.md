@@ -10,7 +10,7 @@ Display Chinese lunar calendar (农历) with holiday information directly in you
 - **Overview Card**: Small cards show today's date, lunar date, solar term and holiday countdown. Enlarge the card to at least 3 × 4 cells for a full lunar month calendar with month navigation, date selection and a return-to-today button.
 - **Full Lunar Calendar**: Popup view showing lunar dates, solar terms (节气), and festivals.
 - **Native DMS Calendar Style**: Both the overview card and bar popup use DMS's `DMonthGrid`, with native month navigation, day cells, selection, hover effects, week numbers and first-day-of-week settings. Click the month title to choose a month.
-- **Holiday Integration**: Real-time indication of holidays and make-up workdays (调休) sourced from `holiday-cn`.
+- **Holiday Integration**: Real-time indication of holidays and make-up workdays (调休) sourced from `holiday-cn`, with automatic fallback to JSDelivr and Fastly JSDelivr when a source fails or returns empty data.
 - **Smart Navigation**: Navigate between months, click to jump to specific dates, and quick return to "Today".
 - **Detailed Info**: View detailed information for any selected date, including days until the next holiday.
 
